@@ -3,7 +3,6 @@
 package agent
 
 import (
-	"errors"
 	"io"
 	"os"
 	"os/exec"

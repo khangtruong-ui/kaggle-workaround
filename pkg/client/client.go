@@ -8,11 +8,9 @@ import (
 	"io"
 	"net"
 	"os"
-	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/khangtruong-ui/kaggle-workaround/pkg/protocol"
@@ -323,29 +321,6 @@ Finished:
 
 	ui.PrintDetachNotice(os.Stdout, agentName)
 	return nil
-}
-
-func (c *Client) watchWindowResize(fd int, done chan struct{}) {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGWINCH)
-
-	go func() {
-		defer signal.Stop(sigChan)
-		for {
-			select {
-			case <-done:
-				return
-			case <-sigChan:
-				w, h, err := term.GetSize(fd)
-				if err == nil && w > 0 && h > 0 {
-					_ = c.stream.SendJSON(protocol.TypeResize, protocol.ResizePayload{
-						Rows: uint16(h),
-						Cols: uint16(w),
-					})
-				}
-			}
-		}
-	}()
 }
 
 // Close closes the client connection.

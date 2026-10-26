@@ -195,15 +195,60 @@ All communications across the single TCP port use a binary framed header:
 
 ---
 
-## Building and Testing
+## Building and Compilation
 
-### Build Binary
+See the comprehensive [Compilation Guide (BUILD.md)](BUILD.md) for detailed platform-specific and cross-compilation instructions.
+
+### Quick Build Commands
+
+#### Native Build (Current Host)
 ```bash
 make build
-# or: go build -o bin/kaggle-workaround ./cmd/relay
+# or: ./scripts/build.sh
 ```
 
-### Run Tests
+#### Machine A (Local Terminal - Mac / Windows / Linux)
+```bash
+# macOS Apple Silicon (M1/M2/M3/M4)
+make build-darwin-arm64
+
+# macOS Intel
+make build-darwin-amd64
+
+# Windows x86_64
+make build-windows
+```
+
+#### Machine B (Relay Server - Google Cloud VM)
+```bash
+make build-linux
+# or with Docker:
+docker build -t kaggle-relay:latest .
+```
+
+#### Machine C (Kaggle Notebook)
+In a Kaggle code cell:
+```python
+!apt-get update -qq && apt-get install -y -qq golang-go
+!git clone https://github.com/khangtruong-ui/kaggle-workaround.git
+%cd kaggle-workaround
+!make build
+```
+Or run the automated bootstrap script:
+```python
+!bash scripts/kaggle_bootstrap.sh --server <GCP_IP>:9090 --secret <SECRET> --name kaggle-gpu
+```
+
+#### Build All Release Targets
+```bash
+make release
+# or: ./scripts/build.sh --all
+```
+
+---
+
+## Testing
+
 ```bash
 make test
 # or: go test -v -race ./...
