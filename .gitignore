@@ -1,0 +1,4 @@
+bin/
+kaggle-workaround
+*.log
+.DS_Store

@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  relay-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kaggle-relay-server
+    restart: always
+    ports:
+      # Only 1 port open on the Google Cloud VM
+      - "9090:9090"
+    environment:
+      - PORT=9090
+      - SECRET=${RELAY_SECRET:-change-me-to-a-secure-secret}
+    command: ["server", "-bind", "0.0.0.0", "-port", "9090"]
