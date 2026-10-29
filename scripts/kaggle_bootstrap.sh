@@ -11,14 +11,18 @@ SECRET=""
 NAME=""
 SHELL_BIN="/bin/bash"
 
+DAEMON_MODE=true
+
 print_help() {
-    echo "Usage: $0 --server <RELAY_IP:PORT> --secret <SECRET> [--name <NAME>]"
+    echo "Usage: $0 --server <RELAY_IP:PORT> --secret <SECRET> [--name <NAME>] [--daemon|--foreground]"
     echo ""
     echo "Options:"
-    echo "  --server   Machine B Relay address (e.g. 34.12.34.56:9090)"
-    echo "  --secret   Shared authentication secret"
-    echo "  --name     Friendly name for this instance (default: hostname)"
-    echo "  --shell    Shell binary to launch (default: /bin/bash)"
+    echo "  --server       Machine B Relay address (e.g. 34.12.34.56:9090)"
+    echo "  --secret       Shared authentication secret"
+    echo "  --name         Friendly name for this instance (default: hostname)"
+    echo "  --shell        Shell binary to launch (default: /bin/bash)"
+    echo "  --daemon, -d   Run agent in background (default: true, unblocks Kaggle cells)"
+    echo "  --foreground   Run agent in foreground (blocks shell)"
     exit 1
 }
 
@@ -28,6 +32,8 @@ while [[ "$#" -gt 0 ]]; do
         --secret) SECRET="$2"; shift ;;
         --name) NAME="$2"; shift ;;
         --shell) SHELL_BIN="$2"; shift ;;
+        --daemon|-d) DAEMON_MODE=true ;;
+        --foreground) DAEMON_MODE=false ;;
         -h|--help) print_help ;;
         *) echo "Unknown parameter: $1"; print_help ;;
     esac
@@ -82,8 +88,16 @@ fi
 
 chmod +x "$BIN_PATH"
 
-echo "[*] Launching agent in background..."
+DAEMON_ARG=""
+if [ "$DAEMON_MODE" = true ]; then
+    DAEMON_ARG="-daemon"
+    echo "[*] Launching agent in background daemon mode (unblocking notebook)..."
+else
+    echo "[*] Launching agent in foreground..."
+fi
+
 "$BIN_PATH" agent \
+    $DAEMON_ARG \
     -server "$SERVER_ADDR" \
     -secret "$SECRET" \
     -name "$NAME" \

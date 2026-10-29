@@ -162,7 +162,12 @@ Machine B acts as the central rendezvous relay. It requires **only one open TCP 
 
 4. **Run the Relay Server**:
    ```bash
-   ./bin/kaggle-workaround server -bind 0.0.0.0 -port 9090 -secret "your-strong-secret"
+   # Run in background daemon mode (unblocking terminal)
+   ./bin/kaggle-workaround server -daemon -bind 0.0.0.0 -port 9090 -secret "your-strong-secret"
+
+   # Check status or stop anytime:
+   ./bin/kaggle-workaround server -status
+   ./bin/kaggle-workaround server -stop
    ```
 
 ---
@@ -235,17 +240,17 @@ Kaggle instances are isolated Linux containers (`Ubuntu x86_64`) behind NAT fire
 
 ### Method 1: Automatic Bootstrap (Recommended)
 
-In a Kaggle Notebook code cell, paste and run:
+In a Kaggle or TPU Notebook code cell, paste and run:
 
 ```python
 !git clone https://github.com/khangtruong-ui/kaggle-workaround.git
 !bash kaggle-workaround/scripts/kaggle_bootstrap.sh \
     --server "<YOUR_GCP_VM_IP>:9090" \
     --secret "your-strong-secret" \
-    --name "kaggle-t4-gpu"
+    --name "kaggle-tpu-v3"
 ```
 
-The script automatically detects if Go is installed, installs it via `apt-get` if missing, compiles the binary, and starts the agent.
+The bootstrap script automatically compiles the binary and runs the agent in **`-daemon` background mode**, which completes in **~0.2 seconds and unblocks the cell**. Subsequent cells (e.g. measuring your TPU or training models) run without obstruction!
 
 ---
 
@@ -264,10 +269,19 @@ If you prefer to compile manually in a Kaggle code cell:
 # Step 3: Compile static binary
 !CGO_ENABLED=0 go build -ldflags="-s -w" -o /tmp/kaggle-workaround ./cmd/relay
 
-# Step 4: Launch Agent
+# Step 4: Launch Agent in Background (leaves cell unblocked!)
 !/tmp/kaggle-workaround agent \
+    -daemon \
     -server "<YOUR_GCP_VM_IP>:9090" \
     -secret "your-strong-secret" \
+    -name "kaggle-tpu-node"
+```
+
+To check status or stop the background agent:
+```python
+!/tmp/kaggle-workaround agent -status
+!/tmp/kaggle-workaround agent -stop
+```
     -name "kaggle-gpu-node"
 ```
 

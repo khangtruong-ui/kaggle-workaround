@@ -94,6 +94,11 @@ func RenderAgentTable(w io.Writer, agents []protocol.AgentInfo) {
 			gpuDisplay = gpuDisplay[:16] + "..."
 		}
 
+		accelColor := Magenta
+		if a.Metadata["accelerator"] == "TPU" {
+			accelColor = BrightCyan + Bold
+		}
+
 		statusBadge := BrightGreen + "● IDLE" + Reset
 		if a.Attached {
 			statusBadge = Yellow + "● ATTACHED" + Reset
@@ -105,7 +110,7 @@ func RenderAgentTable(w io.Writer, agents []protocol.AgentInfo) {
 			BrightCyan+indexStr+Reset,
 			Bold+nameDisplay+Reset,
 			envDisplay,
-			Magenta+gpuDisplay+Reset,
+			accelColor+gpuDisplay+Reset,
 			statusBadge,
 			Gray+uptime+Reset,
 		)

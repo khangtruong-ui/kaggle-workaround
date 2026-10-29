@@ -38,15 +38,60 @@ func CollectMetadata() map[string]string {
 		meta["environment"] = "Linux Instance"
 	}
 
-	// Detect GPU
+	// Detect GPU / TPU accelerators
 	gpu := detectGPU()
-	if gpu != "" {
+	tpu := detectTPU()
+
+	if tpu != "" {
+		meta["gpu"] = tpu
+		meta["accelerator"] = "TPU"
+	} else if gpu != "" {
 		meta["gpu"] = gpu
+		meta["accelerator"] = "GPU"
 	} else {
 		meta["gpu"] = "None (CPU only)"
+		meta["accelerator"] = "CPU"
 	}
 
 	return meta
+}
+
+func detectTPU() string {
+	// 1. Check explicit TPU accelerator type environment variable
+	if tpuType := os.Getenv("TPU_ACCELERATOR_TYPE"); tpuType != "" {
+		return fmt.Sprintf("TPU %s (Google Cloud TPU)", tpuType)
+	}
+
+	// 2. Check Kaggle TPU version flag
+	if tpuVer := os.Getenv("KAGGLE_TPU_VERSION"); tpuVer != "" {
+		return fmt.Sprintf("Kaggle TPU v%s-8", tpuVer)
+	}
+
+	// 3. Check TPU_NAME
+	if tpuName := os.Getenv("TPU_NAME"); tpuName != "" {
+		if accel := os.Getenv("ACCELERATOR_TYPE"); accel != "" {
+			return fmt.Sprintf("TPU %s (%s)", accel, tpuName)
+		}
+		return fmt.Sprintf("TPU (%s)", tpuName)
+	}
+
+	// 4. Check for libtpu runtime library
+	for _, path := range []string{"/lib/libtpu.so", "/usr/local/lib/libtpu.so", "/usr/lib/libtpu.so"} {
+		if _, err := os.Stat(path); err == nil {
+			return "Google Cloud TPU VM"
+		}
+	}
+
+	// 5. Check /dev/accel* device nodes
+	if files, err := os.ReadDir("/dev"); err == nil {
+		for _, f := range files {
+			if strings.HasPrefix(f.Name(), "accel") {
+				return "Google Cloud TPU Device (/dev/" + f.Name() + ")"
+			}
+		}
+	}
+
+	return ""
 }
 
 func detectGPU() string {

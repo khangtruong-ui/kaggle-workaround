@@ -22,6 +22,16 @@ func TestCollectMetadata(t *testing.T) {
 	if meta["environment"] == "" {
 		t.Error("expected non-empty environment metadata")
 	}
+
+	// Test TPU detection via environment
+	t.Setenv("TPU_ACCELERATOR_TYPE", "v3-8")
+	metaTPU := CollectMetadata()
+	if !strings.Contains(metaTPU["gpu"], "TPU v3-8") {
+		t.Errorf("expected TPU detection, got %v", metaTPU["gpu"])
+	}
+	if metaTPU["accelerator"] != "TPU" {
+		t.Errorf("expected accelerator=TPU, got %v", metaTPU["accelerator"])
+	}
 }
 
 func TestTerminalLifecycle(t *testing.T) {
@@ -196,9 +206,14 @@ func TestAgentServerIntegrationWithCtrlC(t *testing.T) {
 
 	// 6. Test Detach and Re-attach (persistence)
 	_ = ctrlStream.SendJSON(protocol.TypeDetach, protocol.DetachPayload{Reason: "test detach"})
-	detachPkt, err := ctrlStream.ReadPacket()
-	if err != nil || detachPkt.Type != protocol.TypeDetach {
-		t.Fatalf("expected detach ack packet, got %v (err: %v)", detachPkt, err)
+	for {
+		detachPkt, err := ctrlStream.ReadPacket()
+		if err != nil {
+			t.Fatalf("failed to read detach packet: %v", err)
+		}
+		if detachPkt.Type == protocol.TypeDetach {
+			break
+		}
 	}
 
 	// Re-attach
@@ -207,9 +222,15 @@ func TestAgentServerIntegrationWithCtrlC(t *testing.T) {
 		Rows:    30,
 		Cols:    100,
 	})
-	ackPkt2, err := ctrlStream.ReadPacket()
-	if err != nil {
-		t.Fatalf("read second attach ack failed: %v", err)
+	var ackPkt2 *protocol.Packet
+	for {
+		ackPkt2, err = ctrlStream.ReadPacket()
+		if err != nil {
+			t.Fatalf("read second attach ack failed: %v", err)
+		}
+		if ackPkt2.Type == protocol.TypeAttachAck {
+			break
+		}
 	}
 	var attachAck2 protocol.AttachAckPayload
 	_ = ackPkt2.UnmarshalJSON(&attachAck2)

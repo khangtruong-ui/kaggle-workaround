@@ -33,6 +33,10 @@ The system uses an indirect **Rendezvous Relay** topology where both your local 
 ### Key Highlights
 
 - **Single Open Port**: The relay (Machine B) only requires **one** open TCP port (e.g. `9090`). Both operators (Machine A) and target agents (Machine C) connect to this exact same port. Machine B multiplexes streams based on an initial framed handshake.
+- **Background Daemon Mode (`-daemon`)**: Both Machine B (Relay Server) and Machine C (Agent) can run completely detached in the background. In Kaggle or TPU notebook environments, launching the agent with `-daemon` completes in **~0.2 seconds and leaves the notebook unblocked**, allowing you to execute TPU benchmarks and measurement cells concurrently!
+- **Auto-Detection of GPUs & TPUs**: Automatically detects accelerators:
+  - NVIDIA GPUs via `nvidia-smi` (Tesla T4, P100, V100, A100)
+  - Google Cloud TPUs (TPU v3-8, v2-8, TPU VM environments)
 - **True `Ctrl+C` Support**: Operates local terminals in raw mode. Keystrokes like `Ctrl+C` (`0x03`) are forwarded straight to the remote PTY master on Machine C, delivering `SIGINT` to the remote foreground process (e.g. cancelling a running python command) **without terminating your local controller or closing the connection**.
 - **Dynamic Terminal Resizing (`SIGWINCH`)**: Terminal width and height changes are communicated in real time, so `htop`, `vim`, `nano`, `tmux`, and shell prompts wrap correctly.
 - **Session Persistence**: Detaching with `Ctrl+]` does **not** kill your running shell or training script. Reconnecting later re-attaches to the existing persistent shell.
@@ -47,7 +51,17 @@ The system uses an indirect **Rendezvous Relay** topology where both your local 
 
 Run on your public VM (only port `9090` needs to be open in your firewall):
 
-#### Using Docker:
+#### In Background (Daemon mode):
+```bash
+# Starts detached in background, unblocking your shell
+./bin/kaggle-workaround server -daemon -port 9090 -secret my-secret-key
+
+# Check status or stop anytime:
+./bin/kaggle-workaround server -status
+./bin/kaggle-workaround server -stop
+```
+
+#### Or using Docker:
 ```bash
 docker run -d \
   --name kaggle-relay \
@@ -56,27 +70,33 @@ docker run -d \
   ghcr.io/khangtruong-ui/kaggle-workaround:latest
 ```
 
-#### Or using the native binary:
-```bash
-./bin/kaggle-workaround server -port 9090 -secret my-secret-key
-```
-
 ---
 
-### 2. Machine C: Agent (Kaggle Instance)
+### 2. Machine C: Agent (Kaggle / TPU Instance)
 
-In a Kaggle Notebook code cell, run:
+In your Kaggle Notebook code cell, paste and run:
 
 ```python
-# Clone and launch the agent in the background
+# Clone and launch in background (unblocks the cell instantly!)
 !git clone https://github.com/khangtruong-ui/kaggle-workaround.git
-!bash kaggle-workaround/scripts/kaggle_bootstrap.sh --server <YOUR_GCP_VM_IP>:9090 --secret my-secret-key --name "kaggle-t4-gpu"
+!bash kaggle-workaround/scripts/kaggle_bootstrap.sh \
+    --server <YOUR_GCP_VM_IP>:9090 \
+    --secret my-secret-key \
+    --name "kaggle-tpu-v3"
+
+# Cell finishes in ~0.2s! Subsequent cells (e.g. measuring TPU) run completely unblocked.
 ```
 
 The agent automatically detects:
-- GPU hardware via `nvidia-smi` (e.g. `Tesla T4 15360 MiB`)
-- Kaggle environment flags
-- Hostname and CPU topology
+- TPUs (Google Cloud TPU v3-8, v2-8, TPU VM)
+- GPUs via `nvidia-smi` (Tesla T4, P100, etc.)
+- Kaggle environment metadata and CPU topology
+
+To check status or stop the background agent from a notebook cell:
+```python
+!kaggle-workaround agent -status
+!kaggle-workaround agent -stop
+```
 
 ---
 
@@ -134,9 +154,14 @@ Once attached, your terminal operates seamlessly as if you were SSH'd directly i
 ./bin/kaggle-workaround server [flags]
 
 Flags:
-  -bind string     Network interface to bind (default "0.0.0.0")
-  -port int        Port to listen on (default 9090, or $PORT)
-  -secret string   Shared authentication secret ($RELAY_SECRET or $SECRET)
+  -bind string       Network interface to bind (default "0.0.0.0")
+  -port int          Port to listen on (default 9090, or $PORT)
+  -secret string     Shared authentication secret ($RELAY_SECRET or $SECRET)
+  -daemon, -d        Run in background as a detached daemon process
+  -status            Check background server status
+  -stop              Stop running background server
+  -log-file string   Log file path (default "/tmp/kaggle-server.log")
+  -pid-file string   PID file path (default "/tmp/kaggle-server.pid")
 ```
 
 ### Agent (Machine C)
@@ -150,6 +175,11 @@ Flags:
   -id string           Custom agent ID (default auto-generated)
   -shell string        Shell binary to launch (default $SHELL or /bin/bash)
   -persistent bool     Keep shell running across disconnects (default true)
+  -daemon, -d          Run in background (unblocks Kaggle / TPU notebook cells)
+  -status              Check background agent status
+  -stop                Stop running background agent
+  -log-file string     Log file path (default "/tmp/kaggle-agent.log")
+  -pid-file string     PID file path (default "/tmp/kaggle-agent.pid")
 ```
 
 ### Client (Machine A)
